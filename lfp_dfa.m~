@@ -1,127 +1,98 @@
-%% lfp_stim_dfa
+%% lfp_dfa
 % analyses lfps recorded from several layers across mouse V1
 % during periods of locomotion and periods of stationarity.
 % Output generated is in 'out' structure. Contains DFA, power and
 % amplitudes computed across various frequencies of interest.
 
-clear 
+clear
+
 % --------------------------
 % VERSION 1
 % --------------------------
 v = 1;
 foi_range       = unique(round(2.^[1:.1:8]));
 freqs = [foi_range-(foi_range./2)/2; foi_range+(foi_range./2)/2]';
-freqs = freqs(1:end-1,:);
 dfa_win = [2 100];
-trl_based= 0;
 % --------------------------
 
-load ~/lfp/dat/expInfo_ori.mat
+load ~/lfp/expInfo.mat
 outdir = '~/lfp/proc/';
 run ~/Documents/MATLAB/toolboxes/NBT-NBTv0.5.3-alpha/installNBT.m
 
 fs = 1250;
 siginfo = nbt_Info;
 siginfo.converted_sample_frequency = fs;
-%%
-% figure;
-warning('off')
-for iexp = 1 : length(e)
+all_depth = [min([d(:).rel_depth]):25:max([d(:).rel_depth])];
+
+for idir = 1 : length(e)
   
-  if ~exist(sprintf([outdir 'lfp_stim_dfa_exp%d_v%d_processing.txt'],iexp,v))
-    system(['touch ' outdir sprintf('lfp_stim_dfa_exp%d_v%d_processing.txt',iexp,v)]);
+  if ~exist(sprintf([outdir 'lfp_dfa_d%d_v%d_processing.txt'],idir,v))
+    system(['touch ' outdir sprintf('lfp_dfa_d%d_v%d_processing.txt',idir,v)]);
   else
     continue
   end
   
-  out.exp_num       = e(iexp).exp_num;
-  out.series_num    = e(iexp).series_num;
-  out.mouse_counter = e(iexp).mouse_counter;
+  clear out
+  out.freqs = freqs;
+  
+  out.exp_num       = e(idir).exp_num;
+  out.mouse_counter = e(idir).mouse_counter;
   out.mouse_id      = m([m.mouse_counter]==out.mouse_counter).mouse_id;
+  out.series_num    = e(idir).series_num;
   out.mouse_notes   = m([m.mouse_counter]==out.mouse_counter).mouse_notes;
-  out.cond          = 2-isempty(strfind(out.mouse_notes,'+/-'));
-  out.cond_descr    = '1=control; 2=pv+knockout';
+  out.mean_speed    = l(idir).mean_speed;
   
-  trls = find([t.exp_num] == out.exp_num & [t.series_num] ==out.series_num & [t.mouse_counter]==out.mouse_counter);
-  out.trials = trls;
+  dd = dir(['~/lfp/dat/' sprintf('%s_s%02d_*_%02d.lfp',out.mouse_id, out.series_num,out.exp_num)]);
   
-  % load and reshape data
-  d = dir(['~/lfp/dat/' sprintf('%s_s%02d_*_%02d.lfp',out.mouse_id, out.series_num,out.exp_num)]);
-  fid = fopen(['~/lfp/dat/' d.name]);
+  fid = fopen(['~/lfp/dat/' dd.name]);
   lfpData = fread(fid,'int16');
   fclose(fid);
-  lfpData = reshape(lfpData, 32, []);
   
-  dat = [];
-  
-  if trl_based
-    dat = zeros(32,2001,length(trls));
-    for itrl = 1 : length(trls)
-      
-      out.time          = [t(trls(itrl)).trial_onset/(30000/fs) t(trls(itrl)).trial_offset/(30000/fs)];
-      out.contrast      = c(t(trls(itrl)).trial_num).grat_contrast;      
-      epoch_ts = double([int64(out.time(1)-0.3*fs) : int64(out.time(1) + 1.3*fs)]);
-      dat(:,:,itrl) = lfpData(:,epoch_ts);
-
-    end
-  else
-    dat = lfpData; clear lfpData
-  end
+  channel_count = 32;
+  % reshape LFP data into channels x samples
+  lfpData = reshape(lfpData, channel_count, []);
   
   for ifoi = 1 : length(freqs)
     
     fprintf('Freq%d...\n',ifoi)
     
-    ampenv = single(nbt_filter_fir(dat',freqs(ifoi,1),freqs(ifoi,2),siginfo.converted_sample_frequency,2/freqs(ifoi,1)));
+    ampenv = single(nbt_filter_fir(lfpData',freqs(ifoi,1),freqs(ifoi,2),siginfo.converted_sample_frequency,2/freqs(ifoi,1)));
     ampenv = abs(hilbert(ampenv));
     
     tmp = tp_dfa(ampenv,dfa_win,fs,0.5,15);
     out.dfa(:,ifoi) = tmp.exp;
     
-    [p,f]=pwelch(dat',hanning(4000),2000,[freqs(ifoi,1):0.1:freqs(ifoi,2)],fs);
+    [p,f]=pwelch(lfpData',hanning(4000),2000,[freqs(ifoi,1):0.1:freqs(ifoi,2)],fs);
     
     out.ampl(:,ifoi)  = mean(ampenv);
     out.pow(:,ifoi)   = mean(p,1);
-    
-    % Compute autocorrelations
-%     for i = 1 : 32
-%       [acf,lags]=autocorr(ampenv(:,i),fs);
-%       out.lambda(i,ifoi)=1./tp_fitexpdecay(acf,1:fs+1,0.02);
-%     end
     %
   end
- 
-  save(sprintf([outdir 'lfp_stim_dfa_exp%d_v%d.mat'],iexp,v),'out');
 
+  save(sprintf([outdir 'lfp_dfa_d%d_v%d.mat'],idir,v),'out');
+  
 end
 
 error('!')
 
-
 %%
-clear out allpow alldfa cond d 
+clear out allpow alldfa
 
 addpath('/home/tpfeffer/Documents/MATLAB/Colormaps/Colormaps (5)/Colormaps/')
-load ~/lfp/dat/expInfo_ori.mat
-dd = dir(sprintf('~/lfp/proc/lfp_stim_dfa_exp*v%d.mat',1));
+load ~/lfp/expInfo.mat
+dd = dir(sprintf('~/lfp/proc/*lfp_dfa*v%d.mat',1));
  
 all_depth = [min([d(:).rel_depth]):25:max([d(:).rel_depth])];
 
 % relative depths from laura
-alldfa   = nan(40,size(freqs,1),2,50);
-allpow   = nan(40,size(freqs,1),2,50);
-allampl  = nan(40,size(freqs,1),2,50);
+alldfa   = nan(40,size(freqs,1),2,length(dd)/2);
+allpow   = nan(40,size(freqs,1),2,length(dd)/2);
+allampl  = nan(40,size(freqs,1),2,length(dd)/2);
 
 cnt1 = 0; cnt2 = 0; subj = 1;
-
 for idir = 1 : length(dd)
 
   load(['~/lfp/proc/' dd(idir).name])
-  clear pow
-  
-%   for ifreq = 1 : length(freqs)
-%     pow(:,ifreq) = mean(out.pow(find(out.freq>=freqs(ifreq,1) & out.freq<=freqs(ifreq,2)),:),1);
-%   end
   
   % ALIGN RECORDINGS
   depth_idx       = [d.mouse_counter]==out.mouse_counter&[d.series_num]==out.series_num;
@@ -135,23 +106,23 @@ for idir = 1 : length(dd)
     cnt1 = cnt1 + 1;
     alldfa(abs_depth_idx,:,1,cnt1)  = out.dfa(indiv_depth_idx,:);
     allpow(abs_depth_idx,:,1,cnt1)  = out.pow(indiv_depth_idx,:);
-%     allampl(abs_depth_idx,:,1,cnt1) = out.ampl(indiv_depth_idx,:);
+    allampl(abs_depth_idx,:,1,cnt1) = out.ampl(indiv_depth_idx,:);
   else
     cnt2 = cnt2 + 1;
     alldfa(abs_depth_idx,:,2,cnt2)  = out.dfa(indiv_depth_idx,:);
     allpow(abs_depth_idx,:,2,cnt2)  = out.pow(indiv_depth_idx,:);
-%     allampl(abs_depth_idx,:,2,cnt2) = out.ampl(indiv_depth_idx,:);
+    allampl(abs_depth_idx,:,2,cnt2) = out.ampl(indiv_depth_idx,:);
   end 
 end
 
-out.freqs = freqs;
+close;
 
 out.dfa  = alldfa(~isnan(nanmean(alldfa(:,1,1,:),4)) & ~isnan(nanmean(alldfa(:,1,2,:),4)),:,:,:);
 out.pow  = allpow(~isnan(nanmean(alldfa(:,1,1,:),4)) & ~isnan(nanmean(alldfa(:,1,2,:),4)),:,:,:);
-% out.ampl = allampl(~isnan(nanmean(alldfa(:,1,1,:),4)) & ~isnan(nanmean(alldfa(:,1,2,:),4)),:,:,:);
+out.ampl = allampl(~isnan(nanmean(alldfa(:,1,1,:),4)) & ~isnan(nanmean(alldfa(:,1,2,:),4)),:,:,:);
 
-out.dfa  = out.dfa(:,:,:,1:min([cnt1 cnt2]));
-out.pow  = out.pow(:,:,:,1:min([cnt1 cnt2]));
+% out.dfa  = alldfa;
+% out.pow  = allpow;
 % out.ampl = allampl;
 
 all_depth = all_depth(~isnan(nanmean(alldfa(:,1,1,:),4)) & ~isnan(nanmean(alldfa(:,1,2,:),4)));
@@ -200,7 +171,7 @@ for icond = 1 : 2
   tp_editplots
   axis([0.5 1 1 size(out.dfa,1)])
 
-  print(gcf,'-dpdf',sprintf('~/lfp/plots/lfp_dfa_stim_c%d_v%d.pdf',icond,v))
+  print(gcf,'-dpdf',sprintf('~/lfp/plots/lfp_dfa_c%d_v%d.pdf',icond,v))
   
 end
 
@@ -214,23 +185,23 @@ subplot(4,4,[5 6])
 par = mean(nanmean(out.dfa(:,:,2,:),1),4)-mean(nanmean(out.dfa(:,:,1,:),1),4);
 plot(par,'linewidth',3); axis tight; box off
 ylabel('DFA exponent'); %xlabel('Frequency')
-axis([1 54 -0.2 0.2])
+axis([1 54 -0.1 0.1])
 line([1 54],[0 0],'linestyle',':','color','k')
 tp_editplots
 set(gca,'XTick',1:4:size(out.freqs,1),'XTickLabels',[])
 
-subplot(4,4,7); hold on; colormap(gca, 'parula'); c = colorbar; axis off
+subplot(4,4,7); hold on; colormap(gca, 'plasma'); c = colorbar; axis off
 c.Position = [0.58 0.55 0.02 0.15];
 c.Ticks = [0 1];
-clim = ['0.1';'0.1'];
+clim = ['0.5';'1.0'];
 c.TickLabels = clim;
-
+  
 subplot(4,4,[9 10 13 14]); hold on
 [~,p] = ttest(out.dfa(:,:,2,:),out.dfa(:,:,1,:),'dim',4);
 [~,p_mask]=fdr(p,0.05);
 par = nanmean(out.dfa(:,:,2,:),4)-nanmean(out.dfa(:,:,1,:),4);
 % par(p_mask==0)=nan;
-imagescnan(par,[-str2num(clim(1,:)) str2num(clim(2,:))]); %colormap(parula)
+imagescnan(par,[-0.1 0.1]); %colormap(parula)
 % layers
 line([1 54],[find(all_depth==-60) find(all_depth==-60)],'linestyle','--','color','w')
 line([1 54],[find(all_depth==65) find(all_depth==65)],'linestyle','--','color','w')
@@ -247,13 +218,13 @@ line([0 0],[1 size(out.dfa,1)],'linestyle','--','color','k'); hold on
 plot(par,1:size(out.dfa,1),'linewidth',3); axis tight; box off
 xlabel('DFA exponent'); %ylabel('Channel #')
 set(gca,'YTick',1:4:length(all_depth),'YTickLabels',[])
-axis([-0.2 0.2 0 37])
+axis([-0.1 0.1 0 37])
 
 tp_editplots
 
-print(gcf,'-dpdf',sprintf('~/lfp/plots/lfp_dfa_stim_contrast_v%d.pdf',v))
+print(gcf,'-dpdf',sprintf('~/lfp/plots/lfp_dfa_contrast_v%d.pdf',v))
 
-%% POWER 
+%% POWER
 
 for icond = 1 : 2
   
@@ -276,7 +247,7 @@ for icond = 1 : 2
   
   subplot(4,4,[9 10 13 14]); hold on
   par = nanmean(out.pow(:,:,icond,:),4);
-  imagesc(log10(par),[str2num(clim(1)) str2num(clim(2))]); %colormap(inferno)
+  imagesc(log10(par),[str2num(clim(1)) str2num(clim(2))]); colormap(inferno)
   xlabel('Frequency [Hz]'); ylabel('Channel #')
   % layers
   line([1 size(out.pow,2)],[find(all_depth==-60) find(all_depth==-60)],'linestyle','--','color','w')
@@ -285,7 +256,7 @@ for icond = 1 : 2
   set(gca,'XTick',1:4:size(out.freqs,1),'XTickLabels',num2cell(mean(out.freqs(1:4:end,:),2)))
   axis([1 size(out.pow,2) 1 size(out.dfa,1)])
   tp_editplots; set(gca,'YDir','reverse')
-  colormap(plasma)
+
   
   subplot(4,4,[11 15])
   par = flipud(mean(nanmean(out.pow(:,:,icond,:),4),2));
@@ -297,7 +268,7 @@ for icond = 1 : 2
   
   tp_editplots
   
-  print(gcf,'-dpdf',sprintf('~/lfp/plots/lfp_pow_stim_c%d_v%d.pdf',icond,v))
+  print(gcf,'-dpdf',sprintf('~/lfp/plots/lfp_pow_c%d_v%d.pdf',icond,v))
   
 end
 
@@ -308,24 +279,24 @@ end
 figure; set(gcf,'color','w')
 
 subplot(4,4,[5 6]); hold on
-par = 100*(mean(nanmean(out.pow(:,:,2,:),1),4)-mean(nanmean(out.pow(:,:,1,:),1),4))./mean(nanmean(out.pow(:,:,1,:),1),4);
+par = mean(nanmean(out.pow(:,:,2,:),1),4)./mean(nanmean(out.pow(:,:,1,:),1),4);
 plot(par,'linewidth',3); axis tight; box off
 ylabel('Change in power'); %xlabel('Frequency')
 line([1 size(out.pow,2)],[1 1],'linestyle',':','color','k')
-axis([1 size(out.pow,2) 0.20 1.5])
+axis([1 size(out.pow,2) 0.5 1.5])
 tp_editplots
 set(gca,'XTick',1:4:size(out.freqs,1),'XTickLabels',[])
 
 subplot(4,4,7); hold on; colormap(gca, 'parula'); c = colorbar; axis off
 c.Position = [0.58 0.55 0.02 0.15];
 c.Ticks = [0 1];
-clim = ['-200';'200'];
+clim = ['0.5';'2.0'];
 c.TickLabels = clim;
 
 subplot(4,4,[9 10 13 14]); hold on
 % [~,p] = ttest(out.pow(:,:,2,:),out.pow(:,:,1,:),'dim',4);
 % [~,p_mask]=fdr(p,0.05);
-par = 100*(nanmean(out.pow(:,:,2,:),4)- nanmean(out.pow(:,:,1,:),4))./nanmean(out.pow(:,:,1,:),4);
+par = nanmean(out.pow(:,:,2,:),4)./nanmean(out.pow(:,:,1,:),4);
 % par(p_mask==0)=nan;
 imagescnan(par,[str2num(clim(1)) str2num(clim(2))]); %colormap(redblue)
 % layers
@@ -340,19 +311,18 @@ tp_editplots
 % colormap(parula)
 
 subplot(4,4,[11 15]); hold on
-par = 100*(flipud(mean(nanmean(out.pow(:,:,2,:),4),2))-flipud(mean(nanmean(out.pow(:,:,1,:),4),2)))./flipud(mean(nanmean(out.pow(:,:,1,:),4),2));
+par = flipud(mean(nanmean(out.pow(:,:,2,:),4),2))./flipud(mean(nanmean(out.pow(:,:,1,:),4),2));
 plot(par,1:size(out.pow,1),'linewidth',3); axis tight; box off
 xlabel('Change in power');
 set(gca,'YTick',1:4:size(out.pow,1),'YTickLabels',[])
 set(gca,'XTick',[0 0.5 1 1.5 2],'XTickLabels',[0 0.5 1 1.5 2])
-axis([-200 200 1 size(out.pow,1)])
+axis([0 2 1 size(out.pow,1)])
 
 line([1 1],[1 size(out.pow,1)],'linestyle',':','color','k')
 
 tp_editplots
 
-print(gcf,'-dpdf',sprintf('~/lfp/plots/lfp_pow_stim_contrast_v%d.pdf',v))
-
+print(gcf,'-dpdf',sprintf('~/lfp/plots/lfp_pow_contrast_v%d.pdf',v))
 
 
 %% AMPLITUDE
@@ -373,7 +343,7 @@ for icond = 1 : 2
   
   subplot(4,4,[9 10 13 14])
   par = nanmean(out.ampl(:,:,icond,:),4);
-  imagesc(log10(par)); colormap(plasma)
+  imagesc(log10(par)); colormap(inferno)
   xlabel('Frequency [Hz]'); ylabel('Channel #')
   
   set(gca,'YTick',1:4:length(all_depth),'YTickLabels',num2cell(all_depth(1:4:end)))
@@ -445,3 +415,4 @@ for icond = 1 : 2
   
   end
 end
+

@@ -232,18 +232,18 @@ par2 = 100*(mean(nanmean(out.pow_stim(:,:,2,:),1),4)-mean(nanmean(out.pow_spon(:
 par = par2-par1;
 
 plot(par,'linewidth',3); axis tight; box off
-ylabel('Abs. difference'); %xlabel('Frequency')
-axis([1 size(out.dfa,2) -150 150])
+ylabel('Change in power [in %]'); %xlabel('Frequency')
+axis([1 size(out.dfa,2) -100 100])
 line([1 size(out.dfa,2)],[0 0],'linestyle','--','color','k')
 tp_editplots
 set(gca,'XTick',1:4:size(out.freqs,1)-1,'XTickLabels',[])
-set(gca,'YTick',[-150 0 150],'YTickLabels',[-150 0 150])
+set(gca,'YTick',[-100 0 100],'YTickLabels',[-150 0 150])
 
 
 subplot(4,4,7); hold on; colormap(gca, 'plasma'); c = colorbar; axis off
 c.Position = [0.58 0.55 0.02 0.15];
 c.Ticks = [0 1];
-clim = ['150';'150'];
+clim = ['100';'100'];
 c.TickLabels = clim;
   
 subplot(4,4,[9 10 13 14]); hold on
@@ -266,12 +266,12 @@ tp_editplots
 set(gca,'YDir','reverse')
 
 subplot(4,4,[11 15]); hold on
-par1 = 100*(flipud(mean(nanmean(out.pow_stim(:,:,1,:),4),2))-flipud(mean(nanmean(out.pow_spon(:,:,1,:),4),2)))./flipud(mean(nanmean(out.pow_spon(:,:,1,:),4),2));
-par2 = 100*(flipud(mean(nanmean(out.pow_stim(:,:,2,:),4),2))-flipud(mean(nanmean(out.pow_spon(:,:,2,:),4),2)))./flipud(mean(nanmean(out.pow_spon(:,:,2,:),4),2));
-par = par2-par1;
+par1 = flipud(mean(nanmean(out.pow_stim(:,:,1,:),4),2))-flipud(mean(nanmean(out.pow_spon(:,:,1,:),4),2));
+par2 = flipud(mean(nanmean(out.pow_stim(:,:,2,:),4),2))-flipud(mean(nanmean(out.pow_spon(:,:,2,:),4),2));
+par = 100*(par2-par1)./par1;
 line([0 0],[1 size(out.dfa_spon,1)],'linestyle','--','color','k'); hold on
 plot(par,1:size(out.pow_spon,1),'linewidth',3); axis tight; box off
-xlabel('Abs. difference'); %ylabel('Channel #')
+xlabel('Change in power [in %]'); %ylabel('Channel #')
 axis([-150 150 1 size(out.pow_spon,1)])
 set(gca,'YTick',1:4:length(all_depth),'YTickLabels',[])
 set(gca,'XTick',[-150 0 150],'XTickLabels',[-150 0 150])

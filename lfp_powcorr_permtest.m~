@@ -135,7 +135,7 @@ subplot(2,2,1); hold on
 plot(out.p_pow_pos,'linewidth',2,'color',[0.9 0.2 0.1])
 plot(out.p_pow_neg,'linewidth',2,'color',[0.1 0.2 0.9])
 line([find(out.p_pow_pos<0.05,1,'first') find(out.p_pow_pos<0.05,1,'last')],[-0.05 -0.05],'linewidth',3,'color','r')
-% line([find(out.p_pow_neg<0.05,1,'first') find(out.p_pow_neg<0.05,1,'last')],[-0.05 -0.05],'linewidth',3,'color','b')
+line([find(out.p_pow_neg<0.05,1,'first') find(out.p_pow_neg<0.05,1,'last')],[-0.05 -0.05],'linewidth',3,'color','b')
 line([1 64],[0.05 0.05],'linestyle',':','color','k')
 axis square; axis([1 64 -0.1 1.1]); tp_editplots
 set(gca,'XTick',1:9:size(freqs,1),'XTickLabels',mean(freqs(1:9:size(freqs,1),:),2))
@@ -157,7 +157,7 @@ subplot(2,2,3); hold on
 plot(out.emp_pow_pos,'linewidth',2,'color',[0.9 0.2 0.1])
 line([find(out.p_pow_pos<0.05,1,'first') find(out.p_pow_pos<0.05,1,'last')],[-0.05 -0.05],'linewidth',3,'color','r')
 plot(out.emp_pow_neg,'linewidth',2,'color',[0.1 0.2 0.9])
-% line([find(out.p_pow_neg<0.05,1,'first') find(out.p_pow_neg<0.05,1,'last')],[-0.05 -0.05],'linewidth',3,'color','b')
+line([find(out.p_pow_neg<0.05,1,'first') find(out.p_pow_neg<0.05,1,'last')],[-0.05 -0.05],'linewidth',3,'color','b')
 axis square; axis([1 64 -0.1 0.82]); tp_editplots
 set(gca,'XTick',1:9:size(freqs,1),'XTickLabels',mean(freqs(1:9:size(freqs,1),:),2))
 xlabel('Frequency [Hz]'); ylabel(sprintf('Fraction of \naltered conn. [%%]'))
